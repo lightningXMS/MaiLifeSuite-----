@@ -1,5 +1,19 @@
 # 更新日志
 
+## 1.2.0（2026-10-29）
+
+### 适配
+
+- **适配 MaiBot 1.3.18**：主程序 1.3.18 要求 `maibot-plugin-sdk>=2.19.0`，启动器把全部插件的 requirements.txt 合并给 pip 一次性解析，旧上限 `<2.17` 与之冲突（ResolutionImpossible，多个镜像源安装全部失败）。SDK 依赖区间放宽为 **`>=2.15.0,<2.20`**（requirements / pyproject / manifest 三处同步），解除安装阻断。
+- manifest `sdk.max_version` 上限同步放宽至 **2.19.99**；宿主兼容范围保持 1.3.6–1.3.99 不变。
+- 插件代码不使用 SDK 2.17+ 的新增 API，区间内新旧 SDK 均可运行：SDK 2.16.0 全量 451 用例回归通过；SDK 2.19.0 临时环境补充验证全套件。
+- 注意：MaiBot 1.3.18 依赖的 `maibot-dashboard==1.9.12` 在部分国内镜像源暂缺，启动器会自动回退官方 PyPI 源，属正常现象。
+
+### 杂项
+
+- `pyproject.toml` `license-files` 补录 `LICENSES/Mai_life-MIT.txt`（此前遗漏，与 README 麦生活 MIT 保留声明不一致）。
+- README 新增「开发与维护脚本」章节：说明 `tools/check_secrets.py`（提交前敏感信息检查）与 `tools/state_stats.py`（生活状态只读统计）的用途与运行方式；两者均为开发辅助工具，不随插件加载运行。
+
 ## 1.1.0（2026-10-28）
 
 ### 新增

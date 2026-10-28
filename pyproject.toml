@@ -1,12 +1,12 @@
 [project]
 name = "mailifesuite"
-version = "1.1.0"
+version = "1.2.0"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE", "LICENSES/Mai_life-MIT.txt", "LICENSES/MaiTrace-legacy-MIT.txt", "LICENSES/message-reader-MIT.txt", "LICENSES/activity-history-MIT.txt"]
 description = "麦麦生活套件：Mai_life 与 MaiTrace 合并的 MaiBot 插件（生活模拟、消息体验、联网见闻、书柜创作与 QQ 空间）"
 requires-python = ">=3.12"
 dependencies = [
-    "maibot-plugin-sdk>=2.15.0,<2.17",
+    "maibot-plugin-sdk>=2.15.0,<2.20",
     "httpx>=0.24.0",
     "beautifulsoup4>=4.12.0",
     "json5>=0.9.0",

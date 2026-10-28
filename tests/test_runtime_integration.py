@@ -448,7 +448,7 @@ class MetadataCase(TestCase):
         self.assertEqual(requirements, set(project["project"]["dependencies"]))
         manifest = json.loads((root / "_manifest.json").read_text(encoding="utf-8"))
         expected = {item["name"] + item["version_spec"] for item in manifest["dependencies"] if item["type"] == "python_package"}
-        # SDK 约束上限从 manifest max_version 推导（2.16.99 → <2.17），与 pyproject/requirements 保持一致。
+        # SDK 约束上限从 manifest max_version 推导（2.19.99 → <2.20），与 pyproject/requirements 保持一致。
         _major, _minor = (int(part) for part in manifest["sdk"]["max_version"].split(".")[:2])
         sdk_requirement = f"maibot-plugin-sdk>={manifest['sdk']['min_version']},<{_major}.{_minor + 1}"
         self.assertIn(sdk_requirement, requirements)
