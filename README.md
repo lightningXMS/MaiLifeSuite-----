@@ -99,14 +99,14 @@ llm_render_retry_interval_seconds = 10
 
 | 项 | 要求 |
 | --- | --- |
-| MaiBot 宿主 | `>=1.3.6`（manifest 声明 1.3.6–1.3.99；已在 1.3.15 一键包宿主实测加载） |
+| MaiBot 宿主 | `>=1.3.6`（manifest 声明 1.3.6–1.3.99；已在 1.3.15 一键包宿主实测加载，1.3.18 的依赖解析冲突已在本版本解除） |
 | 插件 SDK | `maibot-plugin-sdk >=2.15.0, <2.20`（宿主自动校验；MaiBot 1.3.18 要求 SDK ≥2.19.0） |
 | Python | `>=3.12`（随宿主环境） |
 | Python 依赖 | 由宿主按 `_manifest.json` 自动安装：httpx、beautifulsoup4、json5、tzdata、chinese-calendar、lunar-python、playwright |
 | 可选手动安装 | `python -m playwright install chromium`（联网搜索/网页截图需要；不装则自动降级到 API 搜索并记录 `browser_unavailable`） |
 | 可选联动 | 麦麦绘卷（空间 AI 配图）、麦麦绘图 maimai-drawpic-plugin（聊天随手拍联动，`linkage.drawpic_enabled`） |
 
-> 兼容性说明：`host_application.min_version` 取上游麦生活的 1.3.6；麦时迹部分在其上游要求 1.3.11+ 的宿主特性时可能受限。已在 MaiBot 1.3.15 一键包环境完成加载、日程生成与 Routine 决策的实测。
+> 兼容性说明：`host_application.min_version` 取上游麦生活的 1.3.6；麦时迹部分在其上游要求 1.3.11+ 的宿主特性时可能受限。已在 MaiBot 1.3.15 一键包环境完成加载、日程生成与 Routine 决策的实测；针对 MaiBot 1.3.18 要求的 maibot-plugin-sdk 2.19.0，已在独立环境通过全量测试套件（451 用例），宿主加载实测以实际部署为准。
 
 ---
 
@@ -801,13 +801,13 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 
 ## 已知限制与未验证功能
 
-以下事项如实声明（截至 v1.0.0）：
+以下事项如实声明（截至 v1.2.0）：
 
 1. **双生活引擎并存**：麦生活 `life_state` 与麦时迹 `life` 层同时运行（消费同一份日程）。活动时间线一致，但精力/心情数值两套独立、场景/梦境/日记双份生成（额外 LLM 开销）。计划在后续版本统一为单引擎。
 2. **双时区字段**：`[environment].timezone`（麦生活）与 `[schedule].timezone`（麦时迹）独立读取，需用户保持一致；后续收敛为单一字段。
 3. `generate_schedule_v6` / `update_schedule_v6` 在默认 `mai_life_local` 下返回引导信息（重生成走 `/麦麦重生日程`）。
 4. 已在真实宿主（1.3.15 一键包）**验证**：插件加载/注册、配置生成、LLM 日程框架生成、进程内桥接、Routine 决策、数据落盘、重启恢复、运行期零错误。
-5. **未在宿主验证**（仅离线测试或代码审读）：QQ 消息管线与防抖收口的真实消息流、空间发布/评论（需 Cookie 与真实空间）、优雅卸载日志（后台无 Ctrl+C 通道）、WebUI 页面渲染、长时稳定性、约定提醒触发。对应离线测试见 `tests/`（306+ 用例通过，`test_inject.py` 的 14 项因本机缺 MaiBot 源码路径未执行）。
+5. **未在宿主验证**（仅离线测试或代码审读）：QQ 消息管线与防抖收口的真实消息流、空间发布/评论（需 Cookie 与真实空间）、优雅卸载日志（后台无 Ctrl+C 通道）、WebUI 页面渲染、长时稳定性、约定提醒触发。对应离线测试见 `tests/`（451 用例通过；14 项跳过——1 项需同工作区安装绘卷、13 项为 MaiTrace 旧配置迁移链路的合并改造占位，详见各测试的 skip 说明）。
 6. 上游 Mai_life main 分支无测试目录；本仓库测试全部来自 MaiTrace 侧并适配合并结构。
 7. Token 消耗：生活/日程/注入/创作会增加模型调用量（上游麦生活实测提示平均 +1M tokens/日 量级），请结合 `[models]` 编排与 `[usage]` 监控控制成本。
 
