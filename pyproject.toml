@@ -1,0 +1,29 @@
+[project]
+name = "mailifesuite"
+version = "1.1.0"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "LICENSES/MaiTrace-legacy-MIT.txt", "LICENSES/message-reader-MIT.txt", "LICENSES/activity-history-MIT.txt"]
+description = "麦麦生活套件：Mai_life 与 MaiTrace 合并的 MaiBot 插件（生活模拟、消息体验、联网见闻、书柜创作与 QQ 空间）"
+requires-python = ">=3.12"
+dependencies = [
+    "maibot-plugin-sdk>=2.15.0,<2.17",
+    "httpx>=0.24.0",
+    "beautifulsoup4>=4.12.0",
+    "json5>=0.9.0",
+    "tzdata>=2024.1",
+    "chinese-calendar>=1.11.0",
+    "lunar-python>=1.4.0",
+    "playwright>=1.49,<2",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "tomlkit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+# 上级目录加入导入路径，使 `MaiLifeSuite` 包可被解析（tests 以包形态引用插件代码）。
+pythonpath = [".."]

@@ -1,0 +1,15 @@
+# 运行时配置与数据（由 Runner 在插件目录生成，勿入库）
+/config.toml
+/data/
+/temp/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# 本地调试产物
+*.log
+
+# 历史配置备份（可能含密钥，禁止入库）
+/config_back/
