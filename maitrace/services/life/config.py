@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, List, Literal
+from typing import Any, ClassVar, List, Literal
 
 from maibot_sdk import Field, PluginConfigBase
 from pydantic import field_validator, model_validator
@@ -11,7 +11,7 @@ from ...utils.config_validation import clock_time, qq_id
 
 
 class LifeUserProfile(PluginConfigBase):
-    """life.profiles 数组的单个条目；QQ 是身份，显示名来自宿主，最多启用一位主人。"""
+    """life 层用户档案视图；v1.2.0 起不再作为独立配置项，由麦生活 users.profiles 派生。"""
 
     user_id: str = Field(
         default="",
@@ -67,8 +67,8 @@ class ImportantDate(PluginConfigBase):
 
     user_id: str = Field(
         default="",
-        description='日期所属的真实 QQ，必须匹配 life.profiles 的某个用户；该用户启用时才创建提醒素材。',
-        json_schema_extra={'label': '所属 QQ 号', 'hint': '日期所属的真实 QQ，必须匹配 life.profiles 的某个用户；该用户启用时才创建提醒素材。', 'group': '日期', 'order': 1},
+        description='日期所属的真实 QQ，必须匹配「私聊用户」列表中的某个用户；该用户启用时才创建提醒素材。',
+        json_schema_extra={'label': '所属 QQ 号', 'hint': '日期所属的真实 QQ，必须匹配「私聊用户」列表（users.profiles）中的某个用户；该用户启用时才创建提醒素材。', 'group': '日期', 'order': 1},
     )
     name: str = Field(
         default="",
@@ -176,11 +176,6 @@ class LifeSection(PluginConfigBase):
         description='每天从此整点开始允许整理昨天日记，范围 0–23，按 schedule.timezone；在随后素材巡检中执行，有素材时每天一篇。',
         json_schema_extra={'label': '昨日生活日记整理整点', 'hint': '每天从此整点开始允许整理昨天日记，范围 0–23，按 schedule.timezone；在随后素材巡检中执行，有素材时每天一篇。', 'group': '生活素材', 'order': 9, 'depends_on': 'life.diary_enabled', 'depends_value': True},
     )
-    profiles: List[LifeUserProfile] = Field(
-        default_factory=list,
-        description='私聊生活访问和联系许可数组，详见 life.profiles 子字段；QQ 不得重复，最多一位启用主人。空数组不观察个人生活、不主动私聊，也没有私人日记读者。',
-        json_schema_extra={'label': '私聊联系许可', 'hint': '私聊生活访问和联系许可数组，详见 life.profiles 子字段；QQ 不得重复，最多一位启用主人。空数组不观察个人生活、不主动私聊，也没有私人日记读者。', 'group': '私聊用户与日期', 'order': 12},
-    )
     important_dates: List[ImportantDate] = Field(
         default_factory=list,
         description='重要日期数组，详见 life.important_dates 子字段；完整日期必须关联已配置用户，创建提醒素材后还需主动私聊许可才可联系。聊天识别的日期需另行确认。',
@@ -235,20 +230,28 @@ class LifeSection(PluginConfigBase):
     )
 
     @model_validator(mode="after")
-    def validate_users(self) -> "LifeSection":
-        if any(not profile.user_id for profile in self.profiles):
-            raise ValueError("私聊许可条目必须填写 user_id；不用时请删除条目")
-        ids = [profile.user_id for profile in self.profiles if profile.user_id]
-        if len(set(ids)) != len(ids):
-            raise ValueError("私聊用户 QQ 号不能重复")
-        if sum(profile.enabled and profile.role == "owner" for profile in self.profiles) > 1:
-            raise ValueError("最多只能启用一个主人档案")
+    def validate_dates(self) -> "LifeSection":
         for event in self.important_dates:
             if not event.user_id or not event.name.strip() or not event.date:
                 raise ValueError("重要日期必须填写 user_id、name 和 date；不用时请删除条目")
-            if event.user_id not in ids:
-                raise ValueError("重要日期的 user_id 必须匹配 life.profiles 中的用户")
         return self
+
+
+def derive_life_profiles(config: Any) -> List[LifeUserProfile]:
+    """v1.2.0 整合：life 层不再维护独立用户列表，统一从麦生活 users.profiles 派生。
+
+    字段一一对应（QQ/启用/角色/主动许可/每日上限/免打扰时段）；麦生活档案是超集
+    （多出初始关系温度与群转私开关），life 层用不到的字段在此丢弃。
+    """
+    return [
+        LifeUserProfile(
+            user_id=profile.user_id, enabled=profile.enabled, role=profile.role,
+            proactive_enabled=profile.proactive_enabled,
+            daily_proactive_max=profile.daily_proactive_max,
+            quiet_start=profile.quiet_start, quiet_end=profile.quiet_end,
+        )
+        for profile in config.users.profiles
+    ]
 
 
 class EnvironmentSection(PluginConfigBase):

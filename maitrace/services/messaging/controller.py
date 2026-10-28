@@ -173,7 +173,7 @@ class MessagingController:
         if platform != "qq" or not session or not user_id or not message_id:
             return {"action": "continue"}
         known_private = not group_id and any(
-            profile.enabled and profile.user_id == user_id for profile in self.plugin.config.life.profiles
+            profile.enabled and profile.user_id == user_id for profile in self.plugin.config.users.profiles
         )
         if known_private and self.life is not None:
             self._last_inbound_at[session] = time.time()

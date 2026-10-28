@@ -20,10 +20,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from maibot_sdk.context import PluginContext
 
-from MaiLifeSuite.maitrace.config import MaiTracePluginConfig
+from MaiLifeSuite.config import MaiLifeSuiteSettings
+from MaiLifeSuite.mailife_config import UserProfile
 from MaiLifeSuite.maitrace.services.activity import ActivityInfo, ActivityType
 from MaiLifeSuite.maitrace.services.life import LifeEngine, LifeStore
-from MaiLifeSuite.maitrace.services.life.config import ImportantDate, LifeUserProfile
+from MaiLifeSuite.maitrace.services.life.config import ImportantDate
 from MaiLifeSuite.maitrace.services.life.models import LifeState, generate_object, json_object
 from MaiLifeSuite.maitrace.services.life.state import LifeStateEngine
 from MaiLifeSuite.maitrace.services.llm_runner import LLMRunner
@@ -97,14 +98,14 @@ def task_item(task_id: str, token: str, *, item_type: str = "UserMessageItem") -
 class LifeCase(IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.temp = TemporaryDirectory(prefix="maitrace-life-")
-        config = MaiTracePluginConfig()
+        config = MaiLifeSuiteSettings()
         config.environment.calendar_enabled = False
         config.life.scene_enabled = False
         config.life.dream_enabled = False
         config.life.diary_enabled = False
         config.plugin.admin_qq = ["111", "222", "333"]
-        config.life.profiles = [LifeUserProfile(user_id="111", role="owner", proactive_enabled=True, quiet_start="00:00", quiet_end="00:00"),
-                                LifeUserProfile(user_id="222", role="friend", proactive_enabled=True, quiet_start="00:00", quiet_end="00:00")]
+        config.users.profiles = [UserProfile(user_id="111", role="owner", proactive_enabled=True, quiet_start="00:00", quiet_end="00:00"),
+                                 UserProfile(user_id="222", role="friend", proactive_enabled=True, quiet_start="00:00", quiet_end="00:00")]
         config.messaging.enabled = True
         self.rpc, self.generator = FakeRPC(), FakeGenerator()
         self.plugin = SimpleNamespace(config=config, ctx=PluginContext(PLUGIN_ID, rpc_call=self.rpc), _messaging=None)

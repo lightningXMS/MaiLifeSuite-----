@@ -16,6 +16,7 @@ import time
 from ...utils import get_logger
 from ..llm_runner import LLMRunner
 from .commands import LifeCommands
+from .config import derive_life_profiles
 from .environment import EnvironmentService
 from .memory import MemoryService
 from .models import LifeState, ScheduleSource, TextGenerator, anonymous_text, clean_text, generate_object, normalize_snapshot, required_text, stable_id
@@ -72,7 +73,14 @@ class LifeEngine:
         try:
             await self.store.initialize(LifeState(energy=config.initial_energy, hunger=config.initial_hunger,
                                                  last_updated_at=now.timestamp()))
-            await self.store.sync_users(config.profiles)
+            profiles = derive_life_profiles(self.plugin.config)
+            # 重要日期所属用户必须在统一私聊用户列表中；孤儿日期同步后不会产生提醒（用户未启用）。
+            known_users = {profile.user_id for profile in profiles}
+            for event in config.important_dates:
+                if event.user_id and event.user_id not in known_users:
+                    logger.warning("重要日期 %s（%s）所属用户 %s 不在「私聊用户」列表中，提醒不会发送",
+                                   event.name, event.date, event.user_id)
+            await self.store.sync_users(profiles)
             await self.store.sync_dates(config.important_dates)
             await self.environment.start()
             self._private_tasks = {item["claim_token"]: item for item in await self.store.private_tasks(now.timestamp())}

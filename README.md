@@ -4,7 +4,7 @@
 
 # 麦麦生活套件（MaiLifeSuite）
 
-![Plugin Version](https://img.shields.io/badge/Plugin-1.2.0-informational.svg) ![MaiBot](https://img.shields.io/badge/MaiBot-1.3.6%E2%80%931.3.99-blue.svg) ![Plugin SDK](https://img.shields.io/badge/Plugin%20SDK-2.15%E2%80%932.19-blueviolet.svg) ![License](https://img.shields.io/badge/License-AGPL--3.0-green.svg)
+![Plugin Version](https://img.shields.io/badge/Plugin-1.2.1-informational.svg) ![MaiBot](https://img.shields.io/badge/MaiBot-1.3.6%E2%80%931.3.99-blue.svg) ![Plugin SDK](https://img.shields.io/badge/Plugin%20SDK-2.15%E2%80%932.19-blueviolet.svg) ![License](https://img.shields.io/badge/License-AGPL--3.0-green.svg)
 
 由 [Mai_life（麦生活）](https://github.com/octmicy/Mai_life) v1.23.7 与 [MaiTrace（麦时迹）](https://github.com/Rabbit-Jia-Er/MaiTrace) v6.3.0 合并而成的**单一插件**：持续生活状态、每日作息、睡眠梦境、消息体验、联网见闻、书柜创作、QQ 空间分享与互动，以及**活动播报**（白名单/黑名单 + LLM 拟人渲染）。
 
@@ -803,7 +803,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 
 以下事项如实声明（截至 v1.2.0）：
 
-1. **双生活引擎并存**：麦生活 `life_state` 与麦时迹 `life` 层同时运行（消费同一份日程）。活动时间线一致，但精力/心情数值两套独立、场景/梦境/日记双份生成（额外 LLM 开销）。计划在后续版本统一为单引擎。
+1. **双生活引擎并存**：麦生活 `life_state` 与麦时迹 `life` 层同时运行（消费同一份日程）。活动时间线一致，但精力/心情数值两套独立、场景/梦境/日记双份生成（额外 LLM 开销）。计划在后续版本统一为单引擎。两引擎的私聊用户档案已统一为「私聊用户」单一列表，生活层从其派生联系许可，不再单独配置。
 2. **双时区字段**：`[environment].timezone`（麦生活）与 `[schedule].timezone`（麦时迹）独立读取，需用户保持一致；后续收敛为单一字段。
 3. `generate_schedule_v6` / `update_schedule_v6` 在默认 `mai_life_local` 下返回引导信息（重生成走 `/麦麦重生日程`）。
 4. 已在真实宿主（1.3.15 一键包）**验证**：插件加载/注册、配置生成、LLM 日程框架生成、进程内桥接、Routine 决策、数据落盘、重启恢复、运行期零错误。
@@ -821,6 +821,17 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | --- | --- | --- |
 | `tools/check_secrets.py` | 提交前敏感信息检查：扫描 git 跟踪文件中禁止入库的标识模式（含 Tavily API Key 前缀、曾泄漏的 QQ 号/群号等，具体规则见脚本内 `FORBIDDEN` 清单），并拦截配置备份与 `.env` 类文件名入库。发现命中时以退出码 1 失败并列出命中文件与规则；通过则退出码 0。适用于本仓库开发者提交代码或接入 CI 前 | 在克隆的本仓库目录内执行 `python tools/check_secrets.py`（依赖 git 命令与 Python 3 标准库；脚本按自身位置定位仓库根，不依赖当前工作目录）。规则清单在脚本内 `FORBIDDEN` 维护，新增敏感标识时同步追加 |
 | `tools/state_stats.py` | Mai_life 状态动力学统计（**只读**）：读取插件数据库的 `state_snapshots`（每小时一条）与 `mood_events` 表，在控制台输出每日精力/饥饿/心情轨迹、心情起止、睡眠阶段分布、整体均值与心情事件汇总，供长期调参分析；`--csv` 可把逐小时快照导出为 CSV 文件 | `python tools/state_stats.py /path/to/mai_life.db`，可加 `--days N`（默认 30，0=全部）与 `--csv 文件路径`。纯 Python 标准库，无第三方依赖；以只读模式打开数据库（`mode=ro`），不影响运行中的插件。默认相对路径 `data/mai_life.db` 相对当前工作目录解析，建议直接传完整路径（部署实例通常在 `data/plugins/maibot-community.mai-life-suite/mai_life.db`）。快照与事件从部署本版本后开始积累，旧库无历史数据属正常（脚本会提示并正常退出） |
+
+---
+
+## v1.2.1 变更：私聊用户列表统一
+
+此前配置页存在两份重复的私聊用户设置——「私聊用户」（麦生活）与「生活状态与私聊」内的私聊联系许可（麦时迹），QQ/启用/角色/主动私聊许可/每日上限/免打扰时段各配一份且默认值不一致。自 v1.2.1 起**统一为「私聊用户」单一列表**：
+
+- 麦时迹生活层（生活观察、生活主动私聊、私人日记访问角色）运行时从「私聊用户」派生，不再单独配置；该配置项已从配置页移除。
+- 免打扰时段与主动私聊许可以「私聊用户」中配置的值为准。
+- 迁移提示：此前只在生活层配置过、未加入「私聊用户」的 QQ，请补录到「私聊用户」；重要日期所属用户同样匹配该列表，未匹配的日期在启动日志警告且不产生提醒。
+- 两个生活引擎的分工、被动聊天与其他功能不受影响。
 
 ---
 
