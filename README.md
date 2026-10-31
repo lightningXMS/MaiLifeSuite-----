@@ -99,14 +99,14 @@ llm_render_retry_interval_seconds = 10
 
 | 项 | 要求 |
 | --- | --- |
-| MaiBot 宿主 | `>=1.3.6`（manifest 声明 1.3.6–1.3.99；已在 1.3.15 一键包宿主实测加载，1.3.18 的依赖解析冲突已在本版本解除） |
+| MaiBot 宿主 | `>=1.3.6`（manifest 声明 1.3.6–1.3.99；已在 1.3.15 一键包宿主实测加载，1.3.18/1.3.19 的依赖解析冲突已分别在 v1.2.0、v1.2.2 解除） |
 | 插件 SDK | `maibot-plugin-sdk >=2.15.0, <2.22`（宿主自动校验；MaiBot 1.3.19 要求 SDK ≥2.20.0） |
 | Python | `>=3.12`（随宿主环境） |
 | Python 依赖 | 由宿主按 `_manifest.json` 自动安装：httpx、beautifulsoup4、json5、tzdata、chinese-calendar、lunar-python、playwright |
 | 可选手动安装 | `python -m playwright install chromium`（联网搜索/网页截图需要；不装则自动降级到 API 搜索并记录 `browser_unavailable`） |
 | 可选联动 | 麦麦绘卷（空间 AI 配图）、麦麦绘图 maimai-drawpic-plugin（聊天随手拍联动，`linkage.drawpic_enabled`） |
 
-> 兼容性说明：`host_application.min_version` 取上游麦生活的 1.3.6；麦时迹部分在其上游要求 1.3.11+ 的宿主特性时可能受限。已在 MaiBot 1.3.15 一键包环境完成加载、日程生成与 Routine 决策的实测；针对 MaiBot 1.3.18 要求的 maibot-plugin-sdk 2.19.0，已在独立环境通过全量测试套件（451 用例），宿主加载实测以实际部署为准。
+> 兼容性说明：`host_application.min_version` 取上游麦生活的 1.3.6；麦时迹部分在其上游要求 1.3.11+ 的宿主特性时可能受限。已在 MaiBot 1.3.15 一键包环境完成加载、日程生成与 Routine 决策的实测；针对新宿主要求的 maibot-plugin-sdk（2.19.0 / 2.20.0 / 2.21.0），均已在独立环境通过全量测试套件（451 用例），宿主加载实测以实际部署为准。
 
 ---
 
@@ -801,7 +801,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 
 ## 已知限制与未验证功能
 
-以下事项如实声明（截至 v1.2.1）：
+以下事项如实声明（截至 v1.2.2）：
 
 1. **双生活引擎并存**：麦生活 `life_state` 与麦时迹 `life` 层同时运行（消费同一份日程）。活动时间线一致，但精力/心情数值两套独立、场景/梦境/日记双份生成（额外 LLM 开销）。计划在后续版本统一为单引擎。两引擎的私聊用户档案已统一为「私聊用户」单一列表，生活层从其派生联系许可，不再单独配置。
 2. **双时区字段**：`[environment].timezone`（麦生活）与 `[schedule].timezone`（麦时迹）独立读取，需用户保持一致；后续收敛为单一字段。
