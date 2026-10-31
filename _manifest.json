@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "id": "maibot-community.mai-life-suite",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "name": "MaiLifeSuite（麦麦生活套件）",
   "description": "Mai_life 与 MaiTrace 的合并插件：持续生活模拟、消息体验、联网见闻、书柜创作，以及每日作息、临时约定与 QQ 空间分享。",
   "plugin_type": "integration",
@@ -27,7 +27,7 @@
   },
   "sdk": {
     "min_version": "2.15.0",
-    "max_version": "2.19.99"
+    "max_version": "2.21.99"
   },
   "dependencies": [
     {

@@ -4,7 +4,7 @@
 
 # 麦麦生活套件（MaiLifeSuite）
 
-![Plugin Version](https://img.shields.io/badge/Plugin-1.2.1-informational.svg) ![MaiBot](https://img.shields.io/badge/MaiBot-1.3.6%E2%80%931.3.99-blue.svg) ![Plugin SDK](https://img.shields.io/badge/Plugin%20SDK-2.15%E2%80%932.19-blueviolet.svg) ![License](https://img.shields.io/badge/License-AGPL--3.0-green.svg)
+![Plugin Version](https://img.shields.io/badge/Plugin-1.2.2-informational.svg) ![MaiBot](https://img.shields.io/badge/MaiBot-1.3.6%E2%80%931.3.99-blue.svg) ![Plugin SDK](https://img.shields.io/badge/Plugin%20SDK-2.15%E2%80%932.21-blueviolet.svg) ![License](https://img.shields.io/badge/License-AGPL--3.0-green.svg)
 
 由 [Mai_life（麦生活）](https://github.com/octmicy/Mai_life) v1.23.7 与 [MaiTrace（麦时迹）](https://github.com/Rabbit-Jia-Er/MaiTrace) v6.3.0 合并而成的**单一插件**：持续生活状态、每日作息、睡眠梦境、消息体验、联网见闻、书柜创作、QQ 空间分享与互动，以及**活动播报**（白名单/黑名单 + LLM 拟人渲染）。
 
@@ -100,7 +100,7 @@ llm_render_retry_interval_seconds = 10
 | 项 | 要求 |
 | --- | --- |
 | MaiBot 宿主 | `>=1.3.6`（manifest 声明 1.3.6–1.3.99；已在 1.3.15 一键包宿主实测加载，1.3.18 的依赖解析冲突已在本版本解除） |
-| 插件 SDK | `maibot-plugin-sdk >=2.15.0, <2.20`（宿主自动校验；MaiBot 1.3.18 要求 SDK ≥2.19.0） |
+| 插件 SDK | `maibot-plugin-sdk >=2.15.0, <2.22`（宿主自动校验；MaiBot 1.3.19 要求 SDK ≥2.20.0） |
 | Python | `>=3.12`（随宿主环境） |
 | Python 依赖 | 由宿主按 `_manifest.json` 自动安装：httpx、beautifulsoup4、json5、tzdata、chinese-calendar、lunar-python、playwright |
 | 可选手动安装 | `python -m playwright install chromium`（联网搜索/网页截图需要；不装则自动降级到 API 搜索并记录 `browser_unavailable`） |
