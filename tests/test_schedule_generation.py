@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from MaiLifeSuite.config import MaiLifeSuiteSettings
 from MaiLifeSuite.core.storage import LifeStore
-from MaiLifeSuite.life.schedule_service import ScheduleService
+from MaiLifeSuite.life.schedule_service import BUILTIN_IDEAS, WEEKDAY_FLAVOR_DEFAULTS, ScheduleService
 
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 NOW = datetime(2026, 10, 28, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))  # 周三
@@ -53,12 +53,17 @@ class FakeLLM:
         self.payload: list = GOOD_NODES
         self.calls = 0
         self.delay = 0.0
+        self.prompts: list[str] = []
+        self.temperatures: list[float | None] = []
 
     def task_available(self, kind: str) -> bool:
         return self.available
 
-    async def generate_json(self, prompt, system, fallback, max_tokens=0, *, task_kind="", request_type=""):
+    async def generate_json(self, prompt, system, fallback, max_tokens=0, *, task_kind="", request_type="",
+                            temperature=None):
         self.calls += 1
+        self.prompts.append(prompt)
+        self.temperatures.append(temperature)
         if self.delay:
             await asyncio.sleep(self.delay)
         if not self.scripts:
@@ -446,6 +451,131 @@ class GenerationCase(IsolatedAsyncioTestCase):
         state = await self.store.get_generation_state(DAY)
         self.assertEqual(state["status"], "exhausted")
         self.assertEqual(state["fallback_source"], "")  # 未被归档兜底替换
+
+    # ── 逾期补生成与多样性配置 ──
+
+    async def test_21_overdue_restart_regenerates_immediately(self) -> None:
+        """错过生成时间后关机重启：当天无框架且无生成状态时必须立即补生成；重启后不重复。"""
+        llm = FakeLLM()
+        service = make_service(self.store, llm)
+        # 生成时间（凌晨 3 点）宕机错过，04:00 才开机：当天既无框架也无生成状态。
+        overdue = datetime(2026, 10, 28, 4, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        self.assertEqual(await self.store.get_framework(DAY), [])
+        self.assertEqual(await self.store.get_generation_state(DAY), {})
+        nodes = await service.ensure_day(overdue, "p", "晴")
+        self.assertEqual(len(nodes), 9)
+        self.assertEqual(llm.calls, 1)
+        self.assertEqual((await self.store.get_generation_state(DAY))["status"], "success")
+        # 模拟再次重启后的维护巡检：当天已生成，不再请求模型。
+        _, restarted = await self.rebuild()
+        await restarted.ensure_day(overdue, "p", "晴")
+        self.assertEqual(restarted.llm.calls, 0)
+
+    async def test_22_variety_config_reaches_prompt_and_temperature(self) -> None:
+        """温度透传、周特色提示词、内置灵感池补足都真实到达生成 prompt。"""
+        llm = FakeLLM()
+        config = make_config(
+            generation_temperature=0.9,
+            weekday_flavor_prompts="周一收心|周二专注||周四冲刺|周五放松|周六外出|周日休整",
+        )
+        service = make_service(self.store, llm, config)
+        await service.ensure_day(NOW, "p", "晴")  # 2026-10-28 是周三
+        self.assertEqual(llm.temperatures[-1], 0.9)
+        prompt = llm.prompts[-1]
+        # 周三：用户配置第 3 段为空 → 回落内置默认。
+        self.assertIn("今日特色（周三）", prompt)
+        self.assertIn(WEEKDAY_FLAVOR_DEFAULTS[2], prompt)
+        # 无探索笔记/书架素材 → 内置灵感池补足到抽取数量（默认 3）。
+        builtin_hits = sum(1 for idea in BUILTIN_IDEAS if idea in prompt)
+        self.assertGreaterEqual(builtin_hits, 3)
+
+    async def test_23_inspiration_pool_disabled_keeps_legacy_behavior(self) -> None:
+        """关闭灵感池后不注入内置灵感；温度照常透传（1.5 为配置上限）。"""
+        llm = FakeLLM()
+        service = make_service(self.store, llm, make_config(
+            inspiration_pool_enabled=False, generation_temperature=1.5))
+        await service.ensure_day(NOW, "p", "晴")
+        prompt = llm.prompts[-1]
+        self.assertEqual(sum(1 for idea in BUILTIN_IDEAS if idea in prompt), 0)
+        self.assertEqual(llm.temperatures[-1], 1.5)
+        # 温度配置缺失（旧配置对象）时安全回落默认 0.75，不阻断生成。
+        from types import SimpleNamespace
+        object.__setattr__(service, "config", SimpleNamespace(schedule=SimpleNamespace()))
+        self.assertEqual(service._generation_temperature(), 0.75)
+
+    async def test_24_weekday_flavor_custom_line_used(self) -> None:
+        """用户自定义段非空时优先生效，覆盖内置默认。"""
+        llm = FakeLLM()
+        config = make_config(weekday_flavor_prompts="|||||周六全力出门玩")
+        service = make_service(self.store, llm, config)
+        saturday = datetime(2026, 10, 31, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        await service.ensure_day(saturday, "p", "晴")  # 2026-10-31 是周六
+        self.assertIn("今日特色（周六）：周六全力出门玩", llm.prompts[-1])
+        self.assertNotIn(WEEKDAY_FLAVOR_DEFAULTS[5], llm.prompts[-1])
+
+    async def test_25_builtin_ideas_configurable(self) -> None:
+        """灵感池内容可编辑：自定义条目注入 prompt；空白/重复条目被清洗。"""
+        llm = FakeLLM()
+        service = make_service(self.store, llm, make_config(
+            builtin_ideas=[" 自定义灵感·给猫梳毛 ", "", "自定义灵感·给猫梳毛", "自定义灵感·浇花"]))
+        await service.ensure_day(NOW, "p", "晴")
+        prompt = llm.prompts[-1]
+        self.assertIn("自定义灵感·给猫梳毛", prompt)  # 去重后保留一条
+        self.assertIn("自定义灵感·浇花", prompt)
+        self.assertEqual(sum(1 for idea in BUILTIN_IDEAS if idea in prompt), 0)  # 不再注入出厂默认
+
+    async def test_26_builtin_ideas_empty_restores_defaults(self) -> None:
+        """灵感池清空/配置缺失时恢复出厂默认，且默认列表与常量一致。"""
+        llm = FakeLLM()
+        service = make_service(self.store, llm, make_config(builtin_ideas=["  ", ""]))
+        await service.ensure_day(NOW, "p", "晴")
+        self.assertGreaterEqual(sum(1 for idea in BUILTIN_IDEAS if idea in llm.prompts[-1]), 3)
+        # 出厂默认一致性：config 默认列表 == 代码内置回落列表（防止两处漂移）。
+        self.assertEqual(list(MaiLifeSuiteSettings().schedule.builtin_ideas), list(BUILTIN_IDEAS))
+
+
+    async def test_27_force_regeneration_treats_recent_as_blacklist(self) -> None:
+        """强制重生成把近几天日程写成必须避开的硬约束，普通生成仍保持参考措辞。"""
+        await self.store.replace_framework("2026-10-27", _validated(GOOD_NODES, "2026-10-27"))
+        llm = FakeLLM()
+        service = make_service(self.store, llm)
+        await service.ensure_day(NOW, "p", "晴", force=True)
+        prompt = llm.prompts[-1]
+        self.assertIn("严禁复用", prompt)
+        self.assertIn("2026-10-27", prompt)
+        self.assertNotIn("时间结构可以相似", prompt)
+        # 反重复硬规则与"灵感必须落实"要求同时写进 prompt。
+        self.assertIn("同一种活动主题最多连续两天出现", prompt)
+        self.assertIn("至少把一条上面的活动灵感落实为当天的主要活动", prompt)
+        llm.payload = GOOD_NODES_V2
+        tomorrow = datetime(2026, 10, 29, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        await service.ensure_day(tomorrow, "p", "晴")
+        prompt = llm.prompts[-1]
+        self.assertIn("时间结构可以相似", prompt)
+        self.assertNotIn("严禁复用", prompt)
+
+    async def test_28_final_fallback_skips_recent_archives(self) -> None:
+        """兜底随机归档排除今天与最近两天，优先复用较旧存档，避免与隔壁天逐字雷同。"""
+        await self.store.archive_schedule(ARCHIVE_NODES, source_day="2026-10-27", day_type="workday")
+        await self.store.archive_schedule(ARCHIVE_NODES_V2, source_day="2026-10-20", day_type="workday")
+        llm = FakeLLM()
+        llm.scripts = ["sentinel"]
+        service = make_service(self.store, llm, make_config(generation_max_retries=0))
+        nodes = await service.ensure_day(NOW, "p", "晴")
+        self.assertEqual((await self.store.get_generation_state(DAY))["fallback_source"], "archive_random")
+        # 2026-10-27 属最近两天被排除，命中 2026-10-20 的旧存档（摘要带“（新版）”标记）。
+        self.assertIn("（新版）", nodes[2]["summary"])
+
+    async def test_29_dash_placeholder_falls_back_to_default(self) -> None:
+        """短横线占位符等价于留空段：该天回落内置默认，而不是把"-"当成提示词。"""
+        llm = FakeLLM()
+        config = make_config(weekday_flavor_prompts="|||||-")
+        service = make_service(self.store, llm, config)
+        saturday = datetime(2026, 10, 31, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        await service.ensure_day(saturday, "p", "晴")
+        prompt = llm.prompts[-1]
+        self.assertIn(f"今日特色（周六）：{WEEKDAY_FLAVOR_DEFAULTS[5]}", prompt)
+        self.assertNotIn("今日特色（周六）：-", prompt)
 
 
 if __name__ == "__main__":

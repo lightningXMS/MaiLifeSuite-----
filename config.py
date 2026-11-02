@@ -223,6 +223,68 @@ class SuiteScheduleSection(TraceScheduleSection):
             label_en="Archive Retention Days", hint_en="Keep successfully generated schedule archives for this many days.",
         ),
     )
+    generation_temperature: float = Field(
+        default=0.75, ge=0.0, le=1.5,
+        description="每日日程生成的采样温度，越高内容越多样；0.3 以下容易天天雷同。",
+        json_schema_extra=_ui(
+            "日程生成温度", "影响每天日程的多样性：越高越随机多变，越低越稳定趋同。推荐 0.7～0.85。", 102,
+            label_en="Schedule Generation Temperature",
+            hint_en="Higher values make daily schedules more varied. Recommended 0.7-0.85.",
+        ),
+    )
+    weekday_flavor_prompts: str = Field(
+        default="",
+        description="周一到周日的每日特色提示词，7 段用 | 分隔（第 1 段周一…第 7 段周日）；某段留空或只写 - 表示该天使用内置默认。",
+        json_schema_extra=_ui(
+            "每日特色提示词（可选）",
+            "共 7 段，用 | 分隔，从左到右依次是周一到周日（末尾缺的段也算留空），"
+            "写你希望麦麦这天突出的生活特色；不想定制的天把那段留空（两个 | 连着写）或只写一个 -，该天使用内置默认。"
+            "例：早点收心||下午给自己买杯奶茶||||晚上去打球，表示周一收心、周三买奶茶、周日打球，其余天用内置默认。"
+            "整项留空则全部使用内置默认。",
+            103, label_en="Per-weekday Flavor Prompts",
+            hint_en="Seven |-separated segments, Mon..Sun. Leave a segment empty or write a single - "
+                    "to use the built-in default for that day.",
+        ),
+    )
+    inspiration_pool_enabled: bool = Field(
+        default=True,
+        description="启用内置灵感池：探索笔记/书架素材不足时自动补充随机日常活动灵感。",
+        json_schema_extra=_ui(
+            "启用内置灵感池", "每次生成随机抽几条内置活动灵感加进日程，确保素材不因缺少探索记录而枯竭。", 104,
+            label_en="Enable Built-in Inspiration Pool",
+            hint_en="Inject random daily-activity ideas when exploration notes are insufficient.",
+        ),
+    )
+    inspiration_pool_size: int = Field(
+        default=3, ge=1, le=6,
+        description="灵感池每次抽取的数量（与探索笔记、书架素材合并后注入 prompt）。",
+        json_schema_extra=_ui(
+            "灵感池抽取数量", "每次生成随机抽取的内置灵感条数，1～6。", 105,
+            label_en="Inspiration Pool Sample Size", hint_en="How many built-in ideas to sample per generation.",
+        ),
+    )
+    builtin_ideas: List[str] = Field(
+        default_factory=lambda: [
+            "整理一次收藏夹或书签", "给手机相册的旧照片归类", "换一套干净的床品",
+            "研究一道没做过的菜并动手试做", "看一集一直想看的纪录片", "读几章正在追的小说",
+            "练半小时字帖或随手涂鸦", "拼一会儿拼图或模型", "写一小段随笔或日记",
+            "去附近的公园或河边散步", "逛超市挑点新鲜水果", "去书店翻翻感兴趣的新书",
+            "骑车在附近兜一小圈风", "找家咖啡馆坐一小时发呆", "清理衣柜里不再穿的衣服",
+            "给家里的绿植浇水修剪", "修一修家里出问题的小物件", "给房间某个角落做个大扫除",
+            "看一篇有意思的科普或技术文章", "背几十个单词或学几个新词", "看一小节公开课并做笔记",
+            "翻出落灰的游戏打上一两局", "听一张完整的新专辑", "跟着视频学一个简单的拉伸动作",
+            "给老朋友发条问候消息", "逛逛收藏很久还没看的帖子", "整理一遍待办清单并划掉已完成项",
+            "给自己冲一杯手冲咖啡或泡一壶茶", "规划一次下个周末的小出行", "擦一擦桌面并重新布置摆件",
+            "翻翻旧物找找回忆", "早睡半小时给身体充个电",
+        ],
+        description="内置灵感池的活动灵感列表，每次生成日程时随机抽取；清空全部条目则恢复出厂默认。",
+        json_schema_extra=_ui(
+            "内置灵感池（活动灵感）",
+            "生成日程时随机抽取注入的灵感素材，可以自由添加、修改或删除条目；清空全部条目会恢复为出厂默认列表。",
+            106, label_en="Built-in Inspiration Pool",
+            hint_en="Random daily-activity ideas sampled into schedule prompts. Editable list; clearing it restores defaults.",
+        ),
+    )
 
 
 class SuiteEnvironmentSection(EnvironmentSettings):

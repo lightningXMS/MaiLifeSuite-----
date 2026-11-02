@@ -4,7 +4,7 @@
 
 # 麦麦生活套件（MaiLifeSuite）
 
-![Plugin Version](https://img.shields.io/badge/Plugin-1.2.2-informational.svg) ![MaiBot](https://img.shields.io/badge/MaiBot-1.3.6%E2%80%931.3.99-blue.svg) ![Plugin SDK](https://img.shields.io/badge/Plugin%20SDK-2.15%E2%80%932.29-blueviolet.svg) ![License](https://img.shields.io/badge/License-AGPL--3.0-green.svg)
+![Plugin Version](https://img.shields.io/badge/Plugin-1.3.0-informational.svg) ![MaiBot](https://img.shields.io/badge/MaiBot-1.3.6%E2%80%931.3.99-blue.svg) ![Plugin SDK](https://img.shields.io/badge/Plugin%20SDK-2.15%E2%80%932.29-blueviolet.svg) ![License](https://img.shields.io/badge/License-AGPL--3.0-green.svg)
 
 由 [Mai_life（麦生活）](https://github.com/octmicy/Mai_life) v1.23.7 与 [MaiTrace（麦时迹）](https://github.com/Rabbit-Jia-Er/MaiTrace) v6.3.0 合并而成的**单一插件**：持续生活状态、每日作息、睡眠梦境、消息体验、联网见闻、书柜创作、QQ 空间分享与互动，以及**活动播报**（白名单/黑名单 + LLM 拟人渲染）。
 
@@ -42,7 +42,7 @@
 | 领域 | 功能 | 来源 |
 | --- | --- | --- |
 | 生活状态 | 精力/饥饿/心情/健康/睡眠相位推进、身体周期、心境基线回归 | 麦生活 |
-| 生活框架 | 每日生活框架生成（LLM，失败自动重试 + 历史归档随机兜底）、临近节点场景细化 | 麦生活 |
+| 生活框架 | 每日生活框架生成（LLM，温度/每日特色/灵感池可调多样性，失败自动重试 + 历史归档随机兜底且排除最近两天）、临近节点场景细化 | 麦生活 |
 | **活动播报** | 当前活动模板化推送到群聊/私聊：白名单/黑名单双模式、持久化去重、每日限额、失败重试冷却、可选 LLM 拟人渲染 | 合并 |
 | 睡眠体验 | 道晚安、推迟入睡、被叫醒宽限、梦境碎片、抽象日记 | 麦生活 |
 | 消息体验 | 私聊/群聊消息防抖收口、同轮防重、撤回取消回复、可选撤回摘要 | 麦生活 |
@@ -106,7 +106,7 @@ llm_render_retry_interval_seconds = 10
 | 可选手动安装 | `python -m playwright install chromium`（联网搜索/网页截图需要；不装则自动降级到 API 搜索并记录 `browser_unavailable`） |
 | 可选联动 | 麦麦绘卷（空间 AI 配图）、麦麦绘图 maimai-drawpic-plugin（聊天随手拍联动，`linkage.drawpic_enabled`） |
 
-> 兼容性说明：`host_application.min_version` 取上游麦生活的 1.3.6；麦时迹部分在其上游要求 1.3.11+ 的宿主特性时可能受限。已在 MaiBot 1.3.15 一键包环境完成加载、日程生成与 Routine 决策的实测；针对新宿主要求的 maibot-plugin-sdk（2.19.0 / 2.20.0 / 2.21.0），均已在独立环境通过全量测试套件（451 用例），宿主加载实测以实际部署为准。
+> 兼容性说明：`host_application.min_version` 取上游麦生活的 1.3.6；麦时迹部分在其上游要求 1.3.11+ 的宿主特性时可能受限。已在 MaiBot 1.3.15 一键包环境完成加载、日程生成与 Routine 决策的实测；针对新宿主要求的 maibot-plugin-sdk（2.19.0 / 2.20.0 / 2.21.0），均已在独立环境通过当期版本的全量测试套件，宿主加载实测以实际部署为准。
 
 ---
 
@@ -195,7 +195,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | `/麦麦确认日期 <ID> [日期]` | `/mai_date_confirm` | 确认日期候选 |
 | `/麦麦立即创作` | `/mai_create_now` | 管理员立即执行一次创作判断 |
 | `/麦麦转述 <群QQ号> <内容>` | `/mai_relay` | 主人/管理员发起群转述 |
-| `/麦麦重生日程` | `/mai_regenerate_schedule` | 管理员重新生成今日日程（推荐的重生成入口） |
+| `/麦麦重生日程` | `/mai_regenerate_schedule` | 管理员重新生成今日日程（推荐的重生成入口；重生成时会把最近几天日程按"必须避开"处理，避免重生成后仍与前几天雷同） |
 | `/麦麦休息测试` | `/mai_rest_test` | 管理员查看休息闸门状态 |
 
 ---
@@ -282,7 +282,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 
 ## 配置参考
 
-配置由 Runner 首次加载时按模型自动生成 `config.toml`（`.gitignore` 已排除）。以下为**全部 31 段 316 项**的逐项清单（默认值取自当前配置模型，与代码一致）。标注 ⚠️ 的为需要特别注意的项。
+配置由 Runner 首次加载时按模型自动生成 `config.toml`（`.gitignore` 已排除）。以下为**全部 32 段 341 项**的逐项清单（默认值取自当前配置模型，与代码一致）。标注 ⚠️ 的为需要特别注意的项。
 
 ### [plugin] — 总开关、管理员与空间登录（10 项）
 
@@ -299,7 +299,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | http_port | str | 9999 | napcat Cookie 方式的 OneBot HTTP 端口（1–65535 数字字符串） |
 | http_token | str | （空） | napcat Cookie 方式的 HTTP 认证 Token；适配器未设认证时留空 |
 
-### [schedule] — 日程与约定（48 项，含麦生活框架参数）
+### [schedule] — 日程与约定（56 项，含麦生活框架参数）
 
 **开关、提供方与会话范围**
 
@@ -376,6 +376,21 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | detail_lead_minutes | int | 60 | 提前多少分钟细化临近场景 |
 | template_file | str | mai_template.json | 框架生成降级模板（相对插件目录） |
 
+**生成重试与多样性（合并新增）**
+
+| 字段 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| generation_retry_interval_minutes | int | 10 | 生成失败后的重试间隔分钟数（≥1；重试状态跨重启持久化） |
+| generation_max_retries | int | 3 | 生成失败后的最大重试次数（不含首轮；达上限走归档兜底） |
+| generation_template_retention_days | int | 30 | 归档兜底可复用的历史存档保留天数（≥1） |
+| generation_temperature | float | 0.75 | 每日日程生成的采样温度（0–1.5）：越高内容越多样、越低越稳定趋同；推荐 0.7～0.85 |
+| weekday_flavor_prompts | str | （空） | 每日特色提示词：**7 段用 `\|` 分隔写在同一行**（WebUI 输入框不支持换行），从左到右为周一到周日，末尾缺段也算留空；某段留空（两个 `\|` 连写）或只写 `-` = 该天使用内置默认，整项留空全部用内置默认。例：`早点收心\|\|下午给自己买杯奶茶\|\|\|\|晚上去打球` = 周一/周三/周日定制，其余天默认 |
+| inspiration_pool_enabled | bool | true | 启用内置灵感池：探索笔记/书架素材不足时自动补充随机日常活动灵感 |
+| inspiration_pool_size | int | 3 | 每次生成随机抽取的内置灵感条数（1–6） |
+| builtin_ideas | list | 32 条默认 | 内置灵感池活动灵感列表（WebUI 可增删改条目）；清空全部条目恢复出厂默认 |
+
+> 多样性反重复：生成要求含"同一主题最多连续两天，之后必须换新主题或明显推进"；有灵感时至少一条须落实为当天主要活动；`/麦麦重生日程` 会把最近几天日程按"必须避开"的黑名单处理；归档兜底随机复用时排除最近两天的存档。
+
 ### [environment] — 时区、天气与历法（4 项）
 
 | 字段 | 类型 | 默认 | 说明 |
@@ -418,7 +433,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | date_candidate_retention_days | int | 90 | 未确认日期候选保留天数 |
 | date_reminder_lead_days | list | 30,7,1,0 | 提前提醒天数 |
 
-### [rest_gate] — 休息回复闸门（20 项）
+### [rest_gate] — 休息回复闸门（21 项）
 
 | 字段 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
@@ -434,6 +449,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | nap_start / nap_end | str | 12:00 / 14:30 | 午休闸门时间窗 |
 | group_enabled | bool | false | 群聊闸门总开关 |
 | group_mode | enum | all | `all` 全部群 / `selected` 仅开启夜间静音的群 |
+| group_whitelist | list | （空） | 「指定群」模式（`selected`）下的受控群号列表（纯数字，一行一个或逗号分隔）；留空且未配置社交白名单时 selected 模式没有任何群受控（等同不拦截） |
 | group_night_start / group_night_end | str | 22:30 / 08:00 | 群夜间闸门 |
 | group_nap_start / group_nap_end | str | 12:00 / 14:30 | 群午休闸门 |
 | group_gate_segment_types | list | sleep,nap | 群 schedule 模式段型 |
@@ -600,6 +616,28 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | --- | --- | --- | --- |
 | drawpic_enabled | bool | false | 麦麦绘图联动：生活分享时刻注入一次性引导，由麦麦自主决定是否调用 draw 工具（需安装 maimai-drawpic-plugin；群聊不注入，一次最多一张） |
 
+### [announce] — 活动播报（17 项）
+
+| 字段 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| enabled | bool | false | 活动播报总开关；关闭后即使渠道开关开启、名单非空也不会发送 |
+| list_mode | enum | whitelist | `whitelist` 名单=允许目标 / `blacklist` 名单=排除对象（名单外全部已注册会话收到） |
+| group_targets | list | [] | 群聊 QQ 号列表（纯数字，一行一个或逗号分隔）；含义由名单模式决定，仅在真实已注册的群会话生效，不创建新会话 |
+| private_targets | list | [] | 私聊 QQ 号列表（纯数字，一行一个或逗号分隔）；含义由名单模式决定，仅在真实已注册的私聊会话生效，不创建新会话 |
+| group_enabled | bool | false | 群聊播报开关（与总开关、群名单共同控制） |
+| private_enabled | bool | false | 私聊播报开关（与总开关、私名单共同控制） |
+| patrol_interval_minutes | int | 10 | 播报巡查间隔分钟数（1–1440） |
+| daily_max_per_group | int | 5 | 单群每日播报上限（按自然日统计成功发送；0=群聊渠道当日禁发） |
+| daily_max_per_private | int | 3 | 单用户每日播报上限（0=私聊渠道当日禁发） |
+| skip_sleep | bool | true | 睡眠/午休段不播报 |
+| deduplicate | bool | true | 按目标+活动键持久化去重，重载/重启后仍有效 |
+| retry_interval_minutes | int | 10 | 发送失败目标的重试冷却分钟数 |
+| template | str | 📢 麦麦现在去「{activity}」啦～{scene} | 播报文案模板；占位符 `{activity}` 活动名、`{scene}` 场景描述（可为空自动省略）、`{time}` 当前 HH:MM；LLM 渲染关闭或失败时直接使用模板 |
+| llm_render_enabled | bool | false | LLM 拟人渲染（每次播报多一次模型调用；失败/超时不阻断播报，回退模板） |
+| llm_render_task | enum | replyer | 渲染模型任务名（replyer/planner/utils）；任务不可用时自动回退模板 |
+| llm_render_max_retries | int | 1 | 渲染失败后的额外重试次数（0=只调用一次；全部失败不影响播报） |
+| llm_render_retry_interval_seconds | int | 10 | 两次渲染尝试的间隔秒数（0–300） |
+
 ### [persona] — 人设补充（2 项）
 
 | 字段 | 类型 | 默认 | 说明 |
@@ -633,7 +671,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | cleanup_interval | int | 3600 | 后台清理间隔（秒；启动时也执行一次） |
 | cleanup_old_goals_days | int | 30 | 已完成/取消旧作息保留天数 |
 
-### [life] — 麦时迹生活层（18 项）
+### [life] — 麦时迹生活层（17 项）
 
 | 字段 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
@@ -643,7 +681,6 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | initial_energy / initial_hunger | float | 70 / 20 | 首次建库初值（修改不覆盖已有状态） |
 | scene_enabled / dream_enabled / diary_enabled | bool | true | 场景细化 / 梦境 / 私人日记开关 |
 | diary_hour | int | 8 | 私人日记整理起始整点 |
-| profiles | list | [] | 生活私聊许可档案（子字段：user_id、enabled、role=owner/friend、proactive_enabled、daily_proactive_max、quiet_start/quiet_end） |
 | important_dates | list | [] | 重要日期数组（user_id、name、date、yearly、lead_days） |
 | private_proactive_enabled | bool | false | 生活素材驱动的主动私聊总开关 |
 | private_min_interval_minutes | int | 180 | 同用户生活主动最小间隔 |
@@ -653,7 +690,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 | private_pending_seconds | int | 300 | 主动任务有效期 |
 | opportunity_retention_days | int | 30 | 到期未占用素材的额外保留天数 |
 
-> 说明：`[life]`（麦时迹生活层）与麦生活的 `[state]`/`[memory]`/`[rest_gate]` 是**并存的两套生活实现**（见[已知限制](#已知限制与未验证功能)）。`/zn life diary`、`/zn dates` 使用 `[life]`；睡眠相位判醒（rest_gate）与梦境日记（memory）使用麦生活侧。
+> 说明：`[life]`（麦时迹生活层）与麦生活的 `[state]`/`[memory]`/`[rest_gate]` 是**并存的两套生活实现**（见[已知限制](#已知限制与未验证功能)）。`/zn life diary`、`/zn dates` 使用 `[life]`；睡眠相位判醒（rest_gate）与梦境日记（memory）使用麦生活侧。v1.2.1 起 `life.profiles` 已移除，统一由「私聊用户」（`[users].profiles`）派生。
 
 ### [messaging] — 麦时迹生活消息（6 项）
 
@@ -801,13 +838,13 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 
 ## 已知限制与未验证功能
 
-以下事项如实声明（截至 v1.2.2）：
+以下事项如实声明（截至 v1.3.0）：
 
 1. **双生活引擎并存**：麦生活 `life_state` 与麦时迹 `life` 层同时运行（消费同一份日程）。活动时间线一致，但精力/心情数值两套独立、场景/梦境/日记双份生成（额外 LLM 开销）。计划在后续版本统一为单引擎。两引擎的私聊用户档案已统一为「私聊用户」单一列表，生活层从其派生联系许可，不再单独配置。
 2. **双时区字段**：`[environment].timezone`（麦生活）与 `[schedule].timezone`（麦时迹）独立读取，需用户保持一致；后续收敛为单一字段。
 3. `generate_schedule_v6` / `update_schedule_v6` 在默认 `mai_life_local` 下返回引导信息（重生成走 `/麦麦重生日程`）。
 4. 已在真实宿主（1.3.15 一键包）**验证**：插件加载/注册、配置生成、LLM 日程框架生成、进程内桥接、Routine 决策、数据落盘、重启恢复、运行期零错误。
-5. **未在宿主验证**（仅离线测试或代码审读）：QQ 消息管线与防抖收口的真实消息流、空间发布/评论（需 Cookie 与真实空间）、优雅卸载日志（后台无 Ctrl+C 通道）、WebUI 页面渲染、长时稳定性、约定提醒触发。对应离线测试见 `tests/`（451 用例通过；14 项跳过——1 项需同工作区安装绘卷、13 项为 MaiTrace 旧配置迁移链路的合并改造占位，详见各测试的 skip 说明）。
+5. **未在宿主验证**（仅离线测试或代码审读）：QQ 消息管线与防抖收口的真实消息流、空间发布/评论（需 Cookie 与真实空间）、优雅卸载日志（后台无 Ctrl+C 通道）、WebUI 页面渲染、长时稳定性、约定提醒触发。对应离线测试见 `tests/`（460 用例通过；14 项跳过——1 项需同工作区安装绘卷、13 项为 MaiTrace 旧配置迁移链路的合并改造占位，详见各测试的 skip 说明）。
 6. 上游 Mai_life main 分支无测试目录；本仓库测试全部来自 MaiTrace 侧并适配合并结构。
 7. Token 消耗：生活/日程/注入/创作会增加模型调用量（上游麦生活实测提示平均 +1M tokens/日 量级），请结合 `[models]` 编排与 `[usage]` 监控控制成本。
 
@@ -832,6 +869,20 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 - 免打扰时段与主动私聊许可以「私聊用户」中配置的值为准。
 - 迁移提示：此前只在生活层配置过、未加入「私聊用户」的 QQ，请补录到「私聊用户」；重要日期所属用户同样匹配该列表，未匹配的日期在启动日志警告且不产生提醒。
 - 两个生活引擎的分工、被动聊天与其他功能不受影响。
+
+---
+
+## v1.3.0 变更：日程多样性提升
+
+针对"工作日之间、周末之间日程高度雷同，`/麦麦重生日程` 前后仍逐字相近"的问题，本版本围绕**随机性与反重复**做了系统强化（全部为 `[schedule]` 新增设置，不影响既有功能）：
+
+- **日程生成温度**（默认 0.75）：原实现未向模型传温度（实际固定 0.5），现可在 WebUI 调节（0–1.5），越高越多样，推荐 0.7～0.85。
+- **每日特色提示词**：周一到周日各一句特色引导。因 MaiBot WebUI 输入框不支持换行，采用**单行 `|` 分段**写法——共 7 段从左到右对应周一到周日，某段留空（两个 `|` 连写）或只写 `-` 表示该天用内置默认；首次安装保持内置默认，整项留空等于不启用。
+- **内置灵感池**（新功能）：探索笔记/书架素材不足时自动补充随机日常活动灵感。开关、抽取数量（1–6）与灵感列表（32 条出厂默认，WebUI 按黑白名单同款列表样式增删改）均可配置；清空全部条目恢复出厂默认。
+- **反重复硬约束**：生成要求新增"同一活动主题最多连续两天，之后必须换新主题或明显推进"；抽取到灵感时要求至少一条落实为当天主要活动。
+- **重生日程反重复**：`/麦麦重生日程` 把最近几天日程从"可参考"改为"必须避开"的黑名单——只允许沿用时间结构，主题/地点/内容必须明显不同，严禁复用已出现的活动描述。
+- **归档兜底去重**：生成屡败后的随机归档兜底排除今天与最近两天的存档（仅近期存档可用时才回退），避免兜底结果与隔壁天逐字雷同。
+- 逾期/关机错过生成时间后重启会自动补生成（原有机制不变），本版本补充了独立回归测试；全量测试 460 用例通过。
 
 ---
 

@@ -191,9 +191,14 @@ class LLMService:
         return ""
 
     async def generate_json(self, prompt: str, system: str, fallback: Any, max_tokens: int = 0,
-                            *, task_kind: str = "reasoning", request_type: str = "structured") -> Any:
-        """从纯响应、Markdown 代码块或首个 JSON 边界中解析结构化结果。"""
-        raw=await self.generate(prompt,system,max_tokens=max_tokens,task_kind=task_kind,request_type=request_type)
+                            *, task_kind: str = "reasoning", request_type: str = "structured",
+                            temperature: float | None = None) -> Any:
+        """从纯响应、Markdown 代码块或首个 JSON 边界中解析结构化结果。
+
+        temperature=None 时沿用 generate 的默认采样温度；需要更高多样性的调用方显式传入。
+        """
+        extra = {} if temperature is None else {"temperature": temperature}
+        raw=await self.generate(prompt,system,max_tokens=max_tokens,task_kind=task_kind,request_type=request_type,**extra)
         if not raw:return fallback
         candidates=[raw]
         if "```" in raw:

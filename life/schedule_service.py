@@ -5,12 +5,41 @@ import asyncio
 import hashlib
 import json
 import random
+import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 _ALLOWED={"meal","work","study","travel","leisure","sleep","nap","rest"}
+
+# 每日特色提示词内置默认（周一..周日）；用户在 WebUI 里用 | 分隔按天自定义覆盖，留空段回落本默认。
+WEEKDAY_FLAVOR_DEFAULTS: tuple[str, ...] = (
+    "新的一周开始，节奏务实一些，安排收心、做计划和推进正事",
+    "平稳推进日，适合深入专注做一两件事",
+    "一周过半，给自己安排一次小小的犒劳或调剂",
+    "临近周末，收尾冲刺与查漏补缺为主",
+    "本周收官日，晚上适合彻底放松、发展兴趣或与朋友小聚",
+    "周末活力日，适合外出走走、发展兴趣爱好或社交",
+    "周末收尾日，节奏放缓，居家整理并从容准备新的一周",
+)
+
+# 内置灵感池：探索笔记/书架素材不足时随机补充，保证每天都有随机活动灵感可用。
+BUILTIN_IDEAS: tuple[str, ...] = (
+    "整理一次收藏夹或书签", "给手机相册的旧照片归类", "换一套干净的床品",
+    "研究一道没做过的菜并动手试做", "看一集一直想看的纪录片", "读几章正在追的小说",
+    "练半小时字帖或随手涂鸦", "拼一会儿拼图或模型", "写一小段随笔或日记",
+    "去附近的公园或河边散步", "逛超市挑点新鲜水果", "去书店翻翻感兴趣的新书",
+    "骑车在附近兜一小圈风", "找家咖啡馆坐一小时发呆", "清理衣柜里不再穿的衣服",
+    "给家里的绿植浇水修剪", "修一修家里出问题的小物件", "给房间某个角落做个大扫除",
+    "看一篇有意思的科普或技术文章", "背几十个单词或学几个新词", "看一小节公开课并做笔记",
+    "翻出落灰的游戏打上一两局", "听一张完整的新专辑", "跟着视频学一个简单的拉伸动作",
+    "给老朋友发条问候消息", "逛逛收藏很久还没看的帖子", "整理一遍待办清单并划掉已完成项",
+    "给自己冲一杯手冲咖啡或泡一壶茶", "规划一次下个周末的小出行", "擦一擦桌面并重新布置摆件",
+    "翻翻旧物找找回忆", "早睡半小时给身体充个电",
+)
+
+_WEEKDAY_NAMES: tuple[str, ...] = ("周一", "周二", "周三", "周四", "周五", "周六", "周日")
 
 # generate_json 失败时原样返回传入的 fallback 对象（无成功标志），用哨兵做身份判断
 # 才能区分"模型真实生成"与"内部回落"——回落绝不能被记为生成成功。
@@ -209,7 +238,39 @@ class ScheduleService:
 
     # LLM 失败或结果不合格时使用模板骨架，保证日程服务始终可用。
     # 生成前收集三个变化源：最近几天日程、历法背景、兴趣素材；避免每天照抄模板。
-    async def _variety_context(self, now: datetime) -> str:
+    def _weekday_flavor(self, weekday: int) -> str:
+        """每日特色提示词：7 段用 | 分隔（第 1 段周一…第 7 段周日），单行输入框可直接编辑。
+
+        WebUI 的文本框不支持换行，所以不用多行格式。某段留空（两个 | 连着写）、
+        只写占位符"-"，或整段缺失，都回落该天内置默认；全角｜同样按分隔符处理。
+        """
+        default = WEEKDAY_FLAVOR_DEFAULTS[weekday % 7]
+        try:
+            parts = re.split(r"[|｜]", str(self.config.schedule.weekday_flavor_prompts or ""))
+        except Exception:
+            return default
+        if 0 <= weekday < len(parts):
+            custom = parts[weekday].strip()
+            return default if custom in {"", "-"} else custom
+        return default
+
+    def _builtin_ideas(self) -> tuple[str, ...]:
+        """灵感池内容：用户在 WebUI 可编辑（增删改条目）；清洗后为空则恢复内置默认。"""
+        try:
+            custom = list(getattr(self.config.schedule, "builtin_ideas", None) or [])
+        except Exception:
+            return BUILTIN_IDEAS
+        cleaned = tuple(dict.fromkeys(str(item).strip() for item in custom if str(item).strip()))
+        return cleaned or BUILTIN_IDEAS
+
+    def _generation_temperature(self) -> float:
+        """日程生成采样温度（默认 0.75）；配置异常时安全回落，不阻断生成。"""
+        try:
+            return max(0.0, min(1.5, float(self.config.schedule.generation_temperature)))
+        except (TypeError, ValueError, AttributeError):
+            return 0.75
+
+    async def _variety_context(self, now: datetime, force: bool = False) -> str:
         blocks: list[str] = []
         recent: list[str] = []
         for offset in range(1, 6):
@@ -220,7 +281,14 @@ class ScheduleService:
                             if node.get("kind") not in {"sleep"})[:400]
             if text: recent.append(f"{past}：{text}")
         if recent:
-            blocks.append("最近几天的安排（时间结构可以相似，具体内容必须明显错开）：\n"+"\n".join(recent))
+            if force:
+                # 强制重生成（/麦麦重生日程）：近几天日程不能只当参考，必须当作要避开的黑名单，
+                # 否则模型会顺着已有内容续写，重生前后逐字雷同。
+                blocks.append("用户对最近几天的日程不满意，要求重新规划。以下安排只允许参考时间结构，"
+                              "主要活动主题、地点、内容必须与它们明显不同，"
+                              "严禁复用其中出现过的活动描述：\n"+"\n".join(recent))
+            else:
+                blocks.append("最近几天的安排（时间结构可以相似，具体内容必须明显错开）：\n"+"\n".join(recent))
         return "\n".join(blocks)
 
     async def ensure_day(self, now: datetime, personality: str, weather_text: str, force: bool=False,
@@ -282,7 +350,7 @@ class ScheduleService:
             attempts=0
         state=await self.store.get_state()
         ok,nodes,error=await self._generate_once(day,now,state,personality,weather_text,
-                                                 memory_context,environment)
+                                                 memory_context,environment,force=force)
         attempts+=1
         weekend=now.weekday()>=5
         if ok and nodes is not None:
@@ -336,14 +404,18 @@ class ScheduleService:
     async def _generate_once(self, day: str, now: datetime, state: dict[str,Any],
                              personality: str, weather_text: str,
                              memory_context: dict[str,Any]|None,
-                             environment: dict[str,Any]|None) -> tuple[bool,list[dict[str,Any]]|None,str]:
-        """一次真正的生成尝试。成功的唯一定义：模型返回可解析 JSON 且通过日程校验。"""
+                             environment: dict[str,Any]|None,
+                             force: bool = False) -> tuple[bool,list[dict[str,Any]]|None,str]:
+        """一次真正的生成尝试。成功的唯一定义：模型返回可解析 JSON 且通过日程校验。
+
+        force=True 时把近几天日程从"可参考"改成"必须避开"的硬约束（管理员重生成用）。
+        """
         if not self.llm.task_available("schedule"):
             return False,None,"schedule 模型任务不可用"
         # 人格串是身份的唯一来源：刷新到实例，回落模板与提示词都按它定向。
         self._personality=str(personality or "")
         weekend=now.weekday()>=5
-        variety=await self._variety_context(now)
+        variety=await self._variety_context(now, force=force)
         calendar_bits=[str(environment.get(key)) for key in ("day_type","holiday","lunar","solar_term","upcoming_festival")
                        if environment and environment.get(key) and environment.get(key)!="无"]
         if calendar_bits:
@@ -363,9 +435,23 @@ class ScheduleService:
                 title=str(doc.get("title") or "").strip()
                 if title and title!="未命名": ideas.append(f"自己的作品《{title[:30]}》")
         except Exception: pass
-        picked=random.sample(ideas,min(3,len(ideas))) if ideas else []
+        # 灵感池：探索笔记/书架素材不足时用内置池补足（开关+数量可配），保证每天都有随机灵感。
+        cfg=self.config.schedule
+        pool_enabled=bool(getattr(cfg,"inspiration_pool_enabled",True))
+        want=max(1,min(6,int(getattr(cfg,"inspiration_pool_size",3) or 3)))
+        if pool_enabled and len(ideas)<want:
+            pool=self._builtin_ideas()
+            extra=random.sample(pool,min(want-len(ideas),len(pool)))
+            ideas=ideas+[idea for idea in extra if idea not in ideas]
+        sample_n=(max(want,len(ideas)) if pool_enabled else 3)
+        picked=random.sample(ideas,min(sample_n,len(ideas))) if ideas else []
         if picked:
             variety=(variety+"\n今天可以考虑的活动灵感（自由选用，不要硬塞）："+ "、".join(picked)).strip()
+        flavor=self._weekday_flavor(now.weekday())
+        if flavor:
+            variety=(variety+f"\n今日特色（{_WEEKDAY_NAMES[now.weekday()]}）：{flavor}").strip()
+        idea_rule = ("6) 今天必须至少把一条上面的活动灵感落实为当天的主要活动，写进 work/study/leisure 段的 summary，"
+                     "不要全部略过；\n" if picked else "")
         prompt=(f"为虚拟网友{self.bot_name}生成{day}的生活框架。{'周末' if weekend else '工作日'}，天气背景：{weather_text}。\n"
                 f"人格：{personality or '自然、独立、有自己的生活'}\n"
                 f"身份落实：{self._identity_note(personality)}\n"
@@ -379,17 +465,20 @@ class ScheduleService:
                 "禁止'处理自己的事情''放松、看东西和随便逛逛'这类空泛描述；\n"
                 "2) 工作/学习段必须与上面的人格身份一致（学生写上课/自习/社团方向，职场写通勤/工位事务方向，"
                 "自由创作者写约稿/创作方向），location 与身份匹配（学生多用学校、图书馆、食堂、宿舍，"
-                "职场多用公司、工位）；休闲段每天至少有一件事与最近几天不同；\n"
+                "职场多用公司、工位）；休闲段每天至少有一件事与最近几天不同；同一种活动主题最多连续两天出现，"
+                "第三天必须换成新主题或把原有活动明显推进（例如从'读小说'推进到'写读书笔记'），不得原样重复；\n"
                 "3) 节假日、节气、农历和天气要自然反映在活动里；\n"
                 "4) 日程应符合普通人的时间、精力和生活常识，不安排突兀的高强度事项，时间不重叠，包含夜间睡眠和至少两顿饭；\n"
                 "5) energy_load 是该节点对全天精力的影响合计值：工作/学习 -2~-6，睡眠 +4~+8，餐饮 -1，休闲 -1~-3，"
                 "出行 -2~-4；全天 energy_load 合计应与当天精力消耗相抵（接近 0），睡眠增益不要重复计算白天消耗。\n"
+                f"{idea_rule}"
                 "返回JSON数组。字段必须是start,end,kind,summary,location,energy_load,shareability。"
                 "kind只能是meal/work/study/travel/leisure/sleep/nap/rest。")
         try:
             raw=await self.llm.generate_json(prompt,"你是生活日程规划器，只输出合法JSON数组。",
                                              _GEN_FAILED,max_tokens=0,task_kind="schedule",
-                                             request_type="daily_schedule")
+                                             request_type="daily_schedule",
+                                             temperature=self._generation_temperature())
         except Exception as exc:
             return False,None,f"模型调用异常: {exc}"
         if raw is _GEN_FAILED or not isinstance(raw,list):
@@ -416,6 +505,11 @@ class ScheduleService:
                 archives=await self.store.list_archives(now_ts,retention)
         except Exception as exc:
             self.logger.error(f"[MaiLife] 读取日程归档失败: {exc}")
+        # 兜底排除今天和最近两天的归档：否则随机可能抽中隔壁天，导致当天与前一天逐字雷同。
+        recent_days={(now-timedelta(days=offset)).date().isoformat() for offset in range(0,3)}
+        fresh=[item for item in archives if str(item.get("source_day") or "") not in recent_days]
+        if fresh:
+            archives=fresh  # 只有近期归档可用时退回原列表，保证兜底始终有内容。
         random.shuffle(archives)  # 随机选取（可测试：测试可用 random.seed 固定验证）。
         for archive in archives:
             try:
