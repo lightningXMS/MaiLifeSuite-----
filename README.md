@@ -288,7 +288,7 @@ api_keys = ["TAVILY-REPLACE-ME-0000000000000000000000000000"]  # 假 Key 占位�
 
 | 字段 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| config_version | str | 1.11.0 | 配置 Schema 版本，由插件维护，请勿手动修改 |
+| config_version | str | 1.12.0 | 配置 Schema 版本，由插件维护，请勿手动修改 |
 | enabled | bool | true | 总开关；关闭后停止状态维护、日程生成和主动私聊 |
 | llm_model | str | planner | 旧版生活生成任务名；建议改用 `[models]` 编排 |
 | admin_user_ids | list | [] | /麦麦 指令管理员；留空时第一个有效私聊用户自动成为管理员 |
